@@ -5,6 +5,8 @@ import {
     execute,
     IPostContractCallJP,
     PostContractCallInput,
+    sys,
+    uint8ArrayToHex,
 } from "@artela/aspect-libs";
 
 /**
@@ -33,7 +35,12 @@ class Aspect implements IPostContractCallJP {
      * @param input input to the current join point
      */
     postContractCall(input: PostContractCallInput): void {
-        // Implement me...
+        let txData = uint8ArrayToHex(input.call!.data);
+
+        // if call `world` function then revert, 30b67baa is method signature of `world`
+        if (txData.startsWith("30b67baa")) {
+            sys.revert("the function `world` not available");
+        }
     }
 }
 
@@ -43,4 +50,3 @@ entryPoint.setAspect(aspect)
 
 // 3.must export it
 export { execute, allocate }
-
