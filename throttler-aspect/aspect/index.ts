@@ -2,6 +2,7 @@ import {
     allocate,
     entryPoint,
     execute,
+    hexToUint8Array,
     IPreContractCallJP,
     PreContractCallInput,
     sys,
@@ -20,18 +21,31 @@ class Aspect implements IPreContractCallJP {
      */
     preContractCall(input: PreContractCallInput): void {
         // read the throttle config from the properties and decode
-
+        const interval = sys.aspect.property.get<u64>("interval");
+        const limit = sys.aspect.property.get<u64>("limit");
         // get the contract address, from address and build the storage prefix
-
+        const contractAddress = uint8ArrayToHex(input.call!.to);
+        const sender = uint8ArrayToHex(input.call!.from);
+        const storagePrefix = `${contractAddress}:${sender}`;
         // load the current block timestamp
-
+        const blockTimeBytes = sys.hostApi.runtimeContext.get("block.header.timestamp");
+        const blockTime = Protobuf.decode<UintData>(blockTimeBytes, UintData.decode).data;
         // load last execution timestamp
-
+        const lastExecState = sys.aspect.mutableState.get<u64>(storagePrefix + 'lastExecAt');
+        const lastExec = lastExecState.unwrap();
         // check if the throttle interval has passed, revert if not
-
+        if(lastExec > 0 && (blockTime - lastExec) < interval) {
+            sys.revert("throttled");
+        }
         // check if the throttle limit has been reached, revert if so
-
+        const execTimeState = sys.aspect.mutableState.get<u64>(storagePrefix + 'execTime');
+        const execTime = execTimeState.unwrap();
+        if(limit && execTime >= limit) {
+            sys.revert("executin time exceed");
+        }
         // update the throttle state
+        lastExecState.set(blockTime);
+        execTimeState.set(execTime + 1);
     }
 
     /**
@@ -42,7 +56,7 @@ class Aspect implements IPreContractCallJP {
      * @param sender address of the transaction
      * @return true if check success, false if check fail
      */
-    isOwner(sender: Uint8Array): bool {
+    isOwner(sender: Uint8Array): boolean {
         return false;
     }
 }
